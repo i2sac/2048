@@ -4,6 +4,7 @@ import 'package:collection/collection.dart';
 import 'package:flame_audio/flame_audio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_swipe_detector/flutter_swipe_detector.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:twenty_forty_eight/tile.dart';
 import 'package:uuid/uuid.dart';
 
@@ -12,11 +13,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // 2) Chargez vos assets dans le cache audio
-  await FlameAudio.audioCache.loadAll([
-    'laser.mp3',
-    'victory.wav',
-    'laugh.wav',
-  ]);
+  await FlameAudio.audioCache.loadAll(['kick.mp3', 'victory.wav', 'laugh.wav']);
 
   runApp(const MyApp());
 }
@@ -59,7 +56,11 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
-    newGame();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await loadBestScore();
+      newGame();
+    });
   }
 
   List<List<int>> freeSlots() {
@@ -78,7 +79,19 @@ class _MyHomePageState extends State<MyHomePage> {
     return combinations;
   }
 
-  void newGame() {
+  Future<void> loadBestScore() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      best = prefs.getInt('best') ?? 0;
+    });
+  }
+
+  void saveBestScore() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('best', best);
+  }
+
+  void newGame() async {
     setState(() {
       won = false;
       lost = false;
@@ -205,10 +218,11 @@ class _MyHomePageState extends State<MyHomePage> {
       }
     }
 
-    if (merged) await FlameAudio.play('laser.mp3');
+    if (merged) await FlameAudio.play('kick.mp3');
 
     if (tilesData.any((t) => t.val == 2048)) {
       won = true;
+      saveBestScore();
       FlameAudio.play('victory.wav');
     }
   }
@@ -349,6 +363,7 @@ class _MyHomePageState extends State<MyHomePage> {
                               if (!moveOK) {
                                 lost = true;
                                 FlameAudio.play('laugh.wav');
+                                saveBestScore();
                               }
                             });
                           });
@@ -465,7 +480,7 @@ class NumBox extends StatelessWidget {
       child: Column(
         children: [
           Text(
-            'Score',
+            title,
             style: TextStyle(
               color: white,
               letterSpacing: 1,
